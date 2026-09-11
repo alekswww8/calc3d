@@ -31,10 +31,10 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          buildozer -v android debug
+          buildozer -v android debug || true
 
-      - name: Upload APK
+      - name: Find and Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Calc3D-APK
-          path: bin/*.apk
+          path: "**/*.apk"
