@@ -16,11 +16,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Set up JDK 17
+      - name: Set up Java 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '11'
 
       - name: Install dependencies
         run: |
@@ -31,10 +31,10 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          buildozer -v android debug || true
+          buildozer android debug
 
-      - name: Find and Upload APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Calc3D-APK
-          path: "**/*.apk"
+          path: bin/*.apk
