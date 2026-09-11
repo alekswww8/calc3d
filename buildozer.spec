@@ -1,36 +1,21 @@
-name: Build Android APK
+[app]
+title = Calc3D
+package.name = calc3d
+package.domain = org.alekswww8
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+version = 0.1
+requirements = python3,kivy
+orientation = portrait
 
-on:
-  workflow_dispatch:
+android.api = 33
+android.minapi = 21
+android.sdk = 33
+android.ndk = 25b
+android.build_tools_version = 33.0.2
+android.accept_sdk_license = True
+android.archs = arm64-v8a
 
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev
-          pip install --upgrade pip
-          pip install "cython<3.0.0" buildozer
-
-      - name: Build APK with Buildozer
-        run: |
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
-          yes | buildozer android debug || true
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: 3D-Print-Calc-APK
-          path: bin/**/*.apk
+[buildozer]
+log_level = 2
+warn_on_root = 1
