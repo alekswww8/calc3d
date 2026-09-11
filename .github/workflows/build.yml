@@ -23,10 +23,12 @@ jobs:
           pip install --upgrade pip
           pip install "cython<3.0.0" buildozer
 
-      - name: Pre-accept Android licenses
+      - name: Setup Android SDK and Licenses
         run: |
           mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
           cp -r /usr/local/lib/android/sdk/licenses/* /home/runner/.buildozer/android/platform/android-sdk/licenses/ || true
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --install "build-tools;34.0.0" "platforms;android-33"
 
       - name: Build APK with Buildozer
         run: |
