@@ -5,7 +5,7 @@ package.domain = org.alekswww8
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
-requirements = python3,kivy
+requirements = python3,kivy,cython==0.29.33
 orientation = portrait
 android.archs = arm64-v8a, armeabi-v7a
 android.accept_sdk_license = True
