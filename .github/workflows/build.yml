@@ -16,23 +16,23 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install system dependencies
+      - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev
           pip install --upgrade pip
           pip install "cython<3.0.0" buildozer
 
-      - name: Pre-install Build Tools and Accept Licenses
+      - name: Prepare Android SDK and Tools
         run: |
-          mkdir -p ~/.android ~/.buildozer/android/platform/android-sdk/licenses
-          touch ~/.android/repositories.cfg
-          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          cp -r /usr/local/lib/android/sdk/licenses/* ~/.buildozer/android/platform/android-sdk/licenses/ || true
+          mkdir -p /home/runner/.buildozer/android/platform/android-sdk/build-tools
+          mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
+          cp -r /usr/local/lib/android/sdk/licenses/* /home/runner/.buildozer/android/platform/android-sdk/licenses/ || true
+          cp -r /usr/local/lib/android/sdk/build-tools/34.0.0 /home/runner/.buildozer/android/platform/android-sdk/build-tools/ || true
 
       - name: Build APK with Buildozer
         run: |
-          buildozer -v android debug --accept-sdk-license
+          buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
