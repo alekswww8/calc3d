@@ -3,6 +3,7 @@ import struct
 import math
 import sqlite3
 import urllib.parse
+import threading
 from datetime import datetime
 
 from kivy.app import App
@@ -13,11 +14,14 @@ from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
+from kivy.uix.image import Image
+from kivy.properties import NumericProperty
+from kivy.animation import Animation
+from kivy.clock import Clock
 from kivy.core.clipboard import Clipboard
 from kivy.utils import platform
-from kivy.graphics import Mesh, Color, PushMatrix, PopMatrix, Rotate, Translate, Scale
+from kivy.graphics import Mesh, Color, PushMatrix, PopMatrix, Rotate
 from kivy.graphics.transformation import Matrix
-from kivy.graphics.opengl import GL_TRIANGLES
 
 # Локализация (UA, RU, EN)
 LANGUAGES = {
@@ -160,6 +164,15 @@ DEFAULT_PRICES = {"PLA": "800", "CoPET": "700", "PETG": "700", "ABS": "650", "TP
 NOZZLE_SPEEDS = {0.2: "8", 0.4: "18", 0.6: "28", 0.8: "38"}
 
 KV = """
+<SpinningLogo>:
+    canvas.before:
+        PushMatrix
+        Rotate:
+            angle: self.angle
+            origin: self.center
+    canvas.after:
+        PopMatrix
+
 <StyledTextInput@TextInput>:
     multiline: False
     background_color: 0.08, 0.09, 0.12, 1
@@ -189,11 +202,16 @@ ScrollView:
         size_hint_y: None
         height: self.minimum_height
 
-        # Верхняя панель: Заголовок, языки и история
+        # Верхняя панель
         BoxLayout:
             size_hint_y: None
             height: '40dp'
             spacing: '6dp'
+            SpinningLogo:
+                id: logo_img
+                source: 'icon.png'
+                size_hint_x: None
+                width: '40dp'
             Label:
                 id: lbl_title
                 text: "3D КАЛЬКУЛЯТОР"
@@ -329,7 +347,7 @@ ScrollView:
             spacing: '8dp'
             Button:
                 id: btn_share
-                text: "📤 ВІДПРАВИТИ"
+                text: "📤 ВІДПРАВИТЬ"
                 bold: True
                 font_size: '13sp'
                 background_normal: ''
@@ -345,8 +363,26 @@ ScrollView:
                 on_release: app.save_order()
 """
 
+class SpinningLogo(Image):
+    angle = NumericProperty(0)
+    _anim = None
+        
+    def start_spin(self):
+        if self._anim:
+            self._anim.cancel(self)
+        self.angle = 0
+        # 1 оборот (360 градусов) за 2 секунды
+        self._anim = Animation(angle=-360, duration=2.0)
+        self._anim += Animation(angle=0, duration=0)
+        self._anim.repeat = True
+        self._anim.start(self)
+        
+    def stop_spin(self):
+        if self._anim:
+            self._anim.cancel(self)
+        self.angle = 0
+
 def parse_stl_data(file_path):
-    """Считывает геометрию STL и вершины треугольников (проекция 2.5D для мобильного экрана)"""
     if not os.path.exists(file_path) or os.path.getsize(file_path) < 84:
         return 0.0, 0.0, []
     size = os.path.getsize(file_path)
@@ -360,7 +396,7 @@ def parse_stl_data(file_path):
                 if abs(size - (84 + num * 50)) <= 2:
                     total_vol, total_area = 0.0, 0.0
                     batch = 5000 * 50
-                    step = max(1, num // 30000) # Оптимизировано для легкого рендера на смартфонах
+                    step = max(1, num // 30000)
                     idx = 0
                     while True:
                         raw = f.read(batch)
@@ -391,7 +427,6 @@ def parse_stl_data(file_path):
     return 0.0, 0.0, []
 
 class Mobile3DView(Widget):
-    """Сенсорный 3D-вьювер для Android на Kivy Mesh"""
     def __init__(self, raw_points, **kwargs):
         super().__init__(**kwargs)
         self.raw_points = raw_points
@@ -426,19 +461,15 @@ class Mobile3DView(Widget):
             self.coords.append((self.raw_points[i+2] - cz) * self.scale_factor)
 
     def project(self, x, y, z):
-        # Изометрическая проекция вращения
         rad_x = math.radians(self.rot_x)
         rad_y = math.radians(self.rot_y)
         
-        # Поворот вокруг Y
         x1 = x * math.cos(rad_y) + z * math.sin(rad_y)
         z1 = -x * math.sin(rad_y) + z * math.cos(rad_y)
         
-        # Поворот вокруг X
         y2 = y * math.cos(rad_x) - z1 * math.sin(rad_x)
         z2 = y * math.sin(rad_x) + z1 * math.cos(rad_x)
 
-        # Центр экрана
         center_x = self.center_x
         center_y = self.center_y
 
@@ -452,12 +483,10 @@ class Mobile3DView(Widget):
             return
 
         with self.canvas:
-            # Фон стола печати
             Color(0.12, 0.15, 0.2, 1)
             grid_v = []
             grid_idx = []
             
-            # Модель: сочный слайсерный оранжевый цвет
             Color(0.95, 0.48, 0.15, 1)
             v_list = []
             idx_list = []
@@ -468,7 +497,6 @@ class Mobile3DView(Widget):
                 px2, py2 = self.project(self.coords[i+3], self.coords[i+4], self.coords[i+5])
                 px3, py3 = self.project(self.coords[i+6], self.coords[i+7], self.coords[i+8])
 
-                # Простейшее затенение нормалей
                 v_list.extend([px1, py1, 0, 0, px2, py2, 0, 0, px3, py3, 0, 0])
                 idx_list.extend([count, count+1, count+2])
                 count += 3
@@ -527,7 +555,6 @@ class StudioCalcMobileApp(App):
         return LANGUAGES[self.cur_lang].get(key, key)
 
     def init_interface(self):
-        # Материалы
         mb = self.root.ids.mat_box
         self.mat_btns = {}
         for m in ["PLA", "CoPET", "PETG", "ABS", "TPU"]:
@@ -536,7 +563,6 @@ class StudioCalcMobileApp(App):
             self.mat_btns[m] = b
             mb.addWidget(b)
 
-        # Сопла
         nb = self.root.ids.nz_box
         self.nz_btns = {}
         for nz in [0.2, 0.4, 0.6, 0.8]:
@@ -545,7 +571,6 @@ class StudioCalcMobileApp(App):
             self.nz_btns[nz] = b
             nb.addWidget(b)
 
-        # Поля ввода
         gi = self.root.ids.grid_inputs
         self.inputs = {}
         self.labels = {}
@@ -624,7 +649,6 @@ class StudioCalcMobileApp(App):
             from plyer import filechooser
             filechooser.open_file(on_selection=self.on_file_selected)
         else:
-            # Для тестов на ПК
             from plyer import filechooser
             try:
                 filechooser.open_file(on_selection=self.on_file_selected)
@@ -636,13 +660,29 @@ class StudioCalcMobileApp(App):
             path = selection[0]
             self.cur_file = os.path.basename(path)
             self.root.ids.lbl_file_info.text = self.tr("loading")
-            vol, area, points = parse_stl_data(path)
-            self.vol_cm3 = vol
-            self.area_cm2 = area
-            self.mesh_points = points
-            self.root.ids.lbl_file_info.text = f"{self.cur_file} | {self.tr('vol')}: {vol:.2f} cm³"
-            self.root.ids.btn_view3d.disabled = (len(points) == 0)
-            self.recalc()
+            
+            # Запускаем вращение логотипа
+            self.root.ids.logo_img.start_spin()
+            
+            # Отправляем тяжелый расчет в фоновый поток, чтобы экран не вис
+            threading.Thread(target=self._parse_stl_in_background, args=(path,), daemon=True).start()
+
+    def _parse_stl_in_background(self, path):
+        vol, area, points = parse_stl_data(path)
+        # Когда поток закончил считать, возвращаем обновление интерфейса на главный экран
+        Clock.schedule_once(lambda dt: self._on_parse_complete(vol, area, points), 0)
+
+    def _on_parse_complete(self, vol, area, points):
+        self.vol_cm3 = vol
+        self.area_cm2 = area
+        self.mesh_points = points
+        self.root.ids.lbl_file_info.text = f"{self.cur_file} | {self.tr('vol')}: {vol:.2f} cm³"
+        self.root.ids.btn_view3d.disabled = (len(points) == 0)
+        
+        # Останавливаем анимацию логотипа
+        self.root.ids.logo_img.stop_spin()
+        
+        self.recalc()
 
     def open_3d_viewer(self):
         if not self.mesh_points:
