@@ -5,7 +5,7 @@ package.domain = org.alekswww8
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
-requirements = python3,kivy,sqlite3,android
+requirements = python3,kivy,android
 orientation = portrait
 
 android.api = 33
